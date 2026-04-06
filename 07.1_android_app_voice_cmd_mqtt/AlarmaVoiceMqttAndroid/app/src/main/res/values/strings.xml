@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">Voice_Alarm_tz</string>
+    <string name="title">Voice_Alarm_tz</string>
+    <string name="brand_tzone">by TZONE</string>
+    <string name="brand_uptime_zero">00h 00m 00s</string>
+    <string name="brand_uptime_template">%1$02dh %2$02dm %3$02ds</string>
+    <string name="subtitle">Control vocal si MQTT pentru alarma, conectata la brokerul de pe Ubuntu.</string>
+    <string name="logo_content_description">Logo Voice Alarm</string>
+
+    <string name="hint_broker_host">Broker host (ex: 192.168.1.50)</string>
+    <string name="hint_broker_port">Broker port (ex: 18883)</string>
+    <string name="hint_username">Username</string>
+    <string name="hint_password">Password</string>
+    <string name="hint_topic">Topic (ex: control_status_relay)</string>
+
+    <string name="btn_connect">Connect</string>
+    <string name="btn_disconnect">Disconnect</string>
+    <string name="btn_on">ARMEAZA</string>
+    <string name="btn_off">DEZARMEAZA</string>
+    <string name="btn_clear_log">Clear</string>
+    <string name="voice_command_button">Voice</string>
+    <string name="voice_command_label">tz_voice_cmd</string>
+    <string name="voice_command_content_description">Activate voice command</string>
+    <string name="voice_command_prompt">Spune comanda: armeaza sau dezarmeaza. Ascultarea continua va reporni automat.</string>
+    <string name="voice_command_auto_connect">Conectez automat MQTT pentru comanda vocala...</string>
+    <string name="voice_command_connect_first">Conecteaza aplicatia la MQTT inainte de comanda vocala.</string>
+    <string name="voice_command_not_supported">Telefonul nu are serviciu disponibil pentru comenzi vocale.</string>
+    <string name="voice_command_no_match">Nu am inteles comanda vocala. Incearca armeaza sau dezarmeaza.</string>
+    <string name="voice_command_sent">Comanda vocala trimisa: %1$s</string>
+    <string name="voice_command_heard">Voce detectata: %1$s</string>
+    <string name="voice_command_loop_stopped">Ascultarea continua a fost oprita.</string>
+
+    <string name="connection_state_connected">Status: CONNECTED</string>
+    <string name="connection_state_disconnected">Status: DISCONNECTED</string>
+
+    <string name="send_commands">Comenzi</string>
+    <string name="logs">Log MQTT</string>
+
+    <string name="last_message_empty">Ultimul mesaj: -</string>
+    <string name="last_message_template">Ultimul mesaj\nTopic: %1$s\nPayload: %2$s</string>
+</resources>

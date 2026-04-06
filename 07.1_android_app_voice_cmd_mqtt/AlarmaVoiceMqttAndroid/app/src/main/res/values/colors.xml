@@ -1,0 +1,11 @@
+<resources>
+    <color name="seed">#0B5FA5</color>
+    <color name="tzone_orange">#FF8A00</color>
+    <color name="tzone_green_bright">#39FF14</color>
+    <color name="command_button_inactive">#7E7E7E</color>
+    <color name="command_button_green_neon">#39FF14</color>
+    <color name="command_button_off_active">#EF9A9A</color>
+    <color name="command_button_text_light">#FFFFFF</color>
+    <color name="command_button_text_dark">#101010</color>
+    <color name="command_button_stroke">#263238</color>
+</resources>
