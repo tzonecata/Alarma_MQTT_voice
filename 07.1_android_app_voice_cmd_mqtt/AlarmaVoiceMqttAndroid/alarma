@@ -1,0 +1,370 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="/home/ctone/Downloads/Personale_tz/Alarma_Mqtt/07.1_android_app_voice_cmd_mqtt/AlarmaVoiceMqttAndroid"
+TOOLCHAIN_BASE="/home/ctone/Downloads/Personale_tz/Alarma_Mqtt/03_android_kotlin_mqtt_app/.toolchain"
+APK="/home/ctone/Downloads/Personale_tz/Alarma_Mqtt/07.1_android_app_voice_cmd_mqtt/AlarmaVoiceMqttAndroid/app/build/outputs/apk/debug/app_Voice_HA_mgtt.apk"
+ADB="$TOOLCHAIN_BASE/android-sdk/platform-tools/adb"
+BROKER_SCRIPT="$APP_DIR/start_wifi_broker.sh"
+BROKER_PID_FILE="/tmp/alarma_wifi_broker.pid"
+BROKER_LOG_FILE="/tmp/alarma_wifi_broker.log"
+BROKER_PORT="18883"
+MQTT_VENV="/home/ctone/Downloads/Personale_tz/Alarma_Mqtt/06_testing_validation_runbook/mqtt_poc_lab/.venv"
+MQTT_SUB="$MQTT_VENV/bin/amqtt_sub"
+SOAK_SCRIPT="$APP_DIR/overnight_mobile_soak.py"
+SOAK_PID_FILE="/tmp/alarma_mobile_soak.pid"
+SOAK_LOG_FILE="/tmp/alarma_mobile_soak.log"
+SOAK_SERVICE_NAME="alarma-mobile-soak.service"
+SOAK_SERVICE_FILE="$HOME/.config/systemd/user/$SOAK_SERVICE_NAME"
+VOICE_DEMO_SCRIPT="/home/ctone/Downloads/Personale_tz/Alarma_Mqtt/07.1_android_app_voice_cmd_mqtt/demo/demo_voice.sh"
+
+red() { printf '\033[31m%s\033[0m\n' "$*"; }
+green() { printf '\033[32m%s\033[0m\n' "$*"; }
+yellow() { printf '\033[33m%s\033[0m\n' "$*"; }
+
+need_file() {
+  local f="$1"
+  if [[ ! -e "$f" ]]; then
+    red "Missing: $f"
+    exit 1
+  fi
+}
+
+get_ip() {
+  local ip
+  ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}') || true
+  if [[ -z "${ip:-}" ]]; then
+    ip=$(hostname -I 2>/dev/null | awk '{print $1}') || true
+  fi
+  echo "${ip:-UNKNOWN}"
+}
+
+broker_pid() {
+  local pid=""
+  if [[ -f "$BROKER_PID_FILE" ]]; then
+    pid=$(cat "$BROKER_PID_FILE" 2>/dev/null || true)
+    if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
+      echo "$pid"
+      return
+    fi
+  fi
+
+  pid=$(ss -ltnp 2>/dev/null | sed -n "s/.*:${BROKER_PORT} .*pid=\\([0-9]\\+\\).*/\\1/p" | head -n1)
+  if [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null; then
+    echo "$pid" > "$BROKER_PID_FILE"
+    echo "$pid"
+  fi
+}
+
+is_broker_running() {
+  if ss -ltn 2>/dev/null | rg -q ":${BROKER_PORT}\\b"; then
+    local pid
+    pid=$(broker_pid || true)
+    if [[ -n "${pid:-}" ]]; then
+      echo "$pid" > "$BROKER_PID_FILE"
+    fi
+    return 0
+  fi
+  return 1
+}
+
+start_broker() {
+  need_file "$BROKER_SCRIPT"
+  bash "$BROKER_SCRIPT" start
+
+  if is_broker_running; then
+    local started_pid
+    started_pid=$(broker_pid || true)
+    if [[ -n "${started_pid:-}" ]]; then
+      green "Broker started (pid=$started_pid)"
+    else
+      green "Broker started (port $BROKER_PORT)"
+    fi
+  else
+    red "Broker failed to start. See: $BROKER_LOG_FILE"
+    tail -n 50 "$BROKER_LOG_FILE" || true
+    exit 1
+  fi
+}
+
+stop_broker() {
+  need_file "$BROKER_SCRIPT"
+  bash "$BROKER_SCRIPT" stop || true
+
+  if is_broker_running; then
+    yellow "Broker still running on port $BROKER_PORT"
+  else
+    rm -f "$BROKER_PID_FILE"
+    green "Broker stopped"
+  fi
+}
+
+status() {
+  local ip
+  ip=$(get_ip)
+  echo "IP: $ip"
+  if is_broker_running; then
+    local pid
+    pid=$(broker_pid || true)
+    if [[ -n "${pid:-}" ]]; then
+      green "Broker: RUNNING (pid=$pid, port $BROKER_PORT)"
+    else
+      green "Broker: RUNNING (port $BROKER_PORT)"
+    fi
+  else
+    yellow "Broker: STOPPED"
+  fi
+
+  if [[ -x "$ADB" ]]; then
+    local devices
+    devices=$($ADB devices | awk 'NR>1 && $2=="device" {print $1}')
+    if [[ -n "${devices:-}" ]]; then
+      green "ADB device: ${devices//$'\n'/, }"
+    else
+      yellow "ADB device: none"
+    fi
+  else
+    yellow "ADB not found at $ADB"
+  fi
+
+  if [[ -f "$APK" ]]; then
+    echo "APK: $APK"
+  else
+    yellow "APK not found: $APK"
+  fi
+
+  echo "App config:"
+  echo "  Host: $ip"
+  echo "  Port: $BROKER_PORT"
+  echo "  User: mqttuser"
+  echo "  Pass: mqttpass"
+  echo "  Topic: control_status_relay"
+}
+
+install_apk() {
+  need_file "$APK"
+  need_file "$ADB"
+  "$ADB" install -r "$APK"
+}
+
+launch_app() {
+  need_file "$ADB"
+  "$ADB" shell monkey -p com.ctone.alarmamqtt -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+  green "App launched"
+}
+
+run_all() {
+  start_broker
+  install_apk
+  launch_app
+  status
+}
+
+show_logs() {
+  if [[ ! -f "$BROKER_LOG_FILE" ]]; then
+    yellow "No broker log yet: $BROKER_LOG_FILE"
+    return
+  fi
+  tail -f "$BROKER_LOG_FILE"
+}
+
+view_mqtt_messages() {
+  local topic="${1:-control_status_relay}"
+  need_file "$MQTT_SUB"
+
+  if ! is_broker_running; then
+    yellow "Broker not running on port $BROKER_PORT. Start it first with: $0 start"
+    return 1
+  fi
+
+  echo "Viewing MQTT messages live"
+  echo "  URL: mqtt://mqttuser:mqttpass@127.0.0.1:${BROKER_PORT}"
+  echo "  Topic: $topic"
+  echo "Stop by closing the terminal or ending the subscriber process."
+  exec "$MQTT_SUB" --url "mqtt://mqttuser:mqttpass@127.0.0.1:${BROKER_PORT}" -t "$topic" -q 1
+}
+
+run_voice_demo() {
+  need_file "$VOICE_DEMO_SCRIPT"
+  exec bash "$VOICE_DEMO_SCRIPT" "$@"
+}
+
+soak_pid() {
+  if [[ -f "$SOAK_PID_FILE" ]]; then
+    cat "$SOAK_PID_FILE"
+  fi
+}
+
+is_soak_running() {
+  local pid
+  pid=$(soak_pid || true)
+  [[ -n "${pid:-}" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+start_soak() {
+  local hours="${1:-12}"
+  need_file "$SOAK_SCRIPT"
+
+  if command -v systemctl >/dev/null 2>&1; then
+    mkdir -p "$HOME/.config/systemd/user"
+    cat > "$SOAK_SERVICE_FILE" <<EOF
+[Unit]
+Description=Alarma MQTT Mobile Soak (ADB)
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -u $SOAK_SCRIPT --hours $hours
+WorkingDirectory=$APP_DIR
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:$SOAK_LOG_FILE
+StandardError=append:$SOAK_LOG_FILE
+
+[Install]
+WantedBy=default.target
+EOF
+    systemctl --user daemon-reload
+    systemctl --user restart "$SOAK_SERVICE_NAME"
+    if systemctl --user is-active "$SOAK_SERVICE_NAME" >/dev/null 2>&1; then
+      green "Mobile soak started via systemd (hours=$hours)"
+      echo "Service: $SOAK_SERVICE_NAME"
+      echo "Log: $SOAK_LOG_FILE"
+      return
+    fi
+    red "systemd soak start failed"
+    systemctl --user status "$SOAK_SERVICE_NAME" --no-pager --full || true
+    exit 1
+  fi
+
+  if is_soak_running; then
+    green "Mobile soak already running (pid=$(soak_pid))"
+    echo "Log: $SOAK_LOG_FILE"
+    return
+  fi
+
+  nohup python3 -u "$SOAK_SCRIPT" --hours "$hours" </dev/null > "$SOAK_LOG_FILE" 2>&1 &
+  local pid=$!
+  echo "$pid" > "$SOAK_PID_FILE"
+  sleep 1
+  if is_soak_running; then
+    green "Mobile soak started (pid=$pid, hours=$hours)"
+    echo "Log: $SOAK_LOG_FILE"
+  else
+    red "Mobile soak failed to start. See: $SOAK_LOG_FILE"
+    tail -n 80 "$SOAK_LOG_FILE" || true
+    exit 1
+  fi
+}
+
+stop_soak() {
+  if command -v systemctl >/dev/null 2>&1 && [[ -f "$SOAK_SERVICE_FILE" ]]; then
+    systemctl --user stop "$SOAK_SERVICE_NAME" >/dev/null 2>&1 || true
+    if systemctl --user is-active "$SOAK_SERVICE_NAME" >/dev/null 2>&1; then
+      yellow "Mobile soak still running (service=$SOAK_SERVICE_NAME)"
+    else
+      green "Mobile soak stopped (service=$SOAK_SERVICE_NAME)"
+    fi
+    return
+  fi
+
+  local pid
+  pid=$(soak_pid || true)
+  if [[ -z "${pid:-}" ]]; then
+    yellow "Mobile soak not running"
+    rm -f "$SOAK_PID_FILE"
+    return
+  fi
+  kill "$pid" 2>/dev/null || true
+  sleep 1
+  if kill -0 "$pid" 2>/dev/null; then
+    yellow "Mobile soak still running (pid=$pid)"
+  else
+    rm -f "$SOAK_PID_FILE"
+    green "Mobile soak stopped"
+  fi
+}
+
+soak_status() {
+  if command -v systemctl >/dev/null 2>&1 && [[ -f "$SOAK_SERVICE_FILE" ]]; then
+    if systemctl --user is-active "$SOAK_SERVICE_NAME" >/dev/null 2>&1; then
+      green "Mobile soak: RUNNING (service=$SOAK_SERVICE_NAME)"
+    else
+      yellow "Mobile soak: STOPPED (service=$SOAK_SERVICE_NAME)"
+    fi
+    echo "Log: $SOAK_LOG_FILE"
+    if [[ -f "$SOAK_LOG_FILE" ]]; then
+      tail -n 20 "$SOAK_LOG_FILE" || true
+    fi
+    return
+  fi
+
+  if is_soak_running; then
+    green "Mobile soak: RUNNING (pid=$(soak_pid))"
+  else
+    yellow "Mobile soak: STOPPED"
+  fi
+  echo "Log: $SOAK_LOG_FILE"
+  if [[ -f "$SOAK_LOG_FILE" ]]; then
+    tail -n 20 "$SOAK_LOG_FILE" || true
+  fi
+}
+
+menu() {
+  cat <<MENU
+
+Alarma MQTT quick menu
+1) Run all (start broker + install APK + launch app)
+2) Start broker
+3) Stop broker
+4) Status
+5) Install APK
+6) Launch app
+7) Broker logs
+8) View MQTT messages
+9) Voice demo (1 min publish, apoi listen-only)
+10) Start mobile soak (12h)
+11) Soak status
+12) Stop soak
+0) Exit
+MENU
+  read -r -p "Choose: " opt
+  case "$opt" in
+    1) run_all ;;
+    2) start_broker ;;
+    3) stop_broker ;;
+    4) status ;;
+    5) install_apk ;;
+    6) launch_app ;;
+    7) show_logs ;;
+    8) view_mqtt_messages ;;
+    9) run_voice_demo ;;
+    10) start_soak 12 ;;
+    11) soak_status ;;
+    12) stop_soak ;;
+    0) exit 0 ;;
+    *) yellow "Invalid option" ;;
+  esac
+}
+
+cmd="${1:-menu}"
+case "$cmd" in
+  run) run_all ;;
+  start) start_broker ;;
+  stop) stop_broker ;;
+  status) status ;;
+  install) install_apk ;;
+  launch) launch_app ;;
+  logs) show_logs ;;
+  messages) shift; view_mqtt_messages "${1:-control_status_relay}" ;;
+  voice-demo) shift; run_voice_demo "$@" ;;
+  soak-start) start_soak "${2:-12}" ;;
+  soak-stop) stop_soak ;;
+  soak-status) soak_status ;;
+  menu) menu ;;
+  *)
+    red "Unknown command: $cmd"
+    echo "Usage: $0 [run|start|stop|status|install|launch|logs|messages [topic]|voice-demo [extra-args]|soak-start [hours]|soak-status|soak-stop|menu]"
+    exit 2
+    ;;
+esac
