@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mqtt-poc-lab"
+version = "0.1.0"
+description = "End-to-end MQTT lab for relay control/status validation and long-running soak tests"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Alarma MQTT Lab" }
+]
+dependencies = [
+  "amqtt==0.11.3",
+  "paho-mqtt>=2.1.0,<3.0.0",
+  "PyYAML>=6.0.0,<7.0.0",
+]
+
+[project.scripts]
+mqtt-lab = "mqtt_poc_lab.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

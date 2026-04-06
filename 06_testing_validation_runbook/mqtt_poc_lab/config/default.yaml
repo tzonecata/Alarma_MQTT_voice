@@ -1,0 +1,16 @@
+topic: control_status_relay
+broker:
+  host: 127.0.0.1
+  port: 18883
+  username: mqttuser
+  password: mqttpass
+relay:
+  initial_state: "OFF"
+status_publisher:
+  interval_seconds: 10.0
+load_generator:
+  min_interval_seconds: 20.0
+  max_interval_seconds: 45.0
+test:
+  duration_seconds: 300
+  qos: 1
