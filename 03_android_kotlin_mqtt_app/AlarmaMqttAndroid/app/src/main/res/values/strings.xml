@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">Alarma MQTT</string>
+    <string name="title">MQTT Relays Control</string>
+    <string name="brand_tzone">by TZONE</string>
+    <string name="brand_uptime_zero">00h 00m 00s</string>
+    <string name="brand_uptime_template">%1$02dh %2$02dm %3$02ds</string>
+    <string name="subtitle">Conecteaza-te la brokerul de pe Ubuntu (IP din reteaua Wi-Fi, nu 127.0.0.1).</string>
+
+    <string name="hint_broker_host">Broker host (ex: 192.168.1.50)</string>
+    <string name="hint_broker_port">Broker port (ex: 18883)</string>
+    <string name="hint_username">Username</string>
+    <string name="hint_password">Password</string>
+    <string name="hint_topic">Topic (ex: control_status_relay)</string>
+
+    <string name="btn_connect">Connect</string>
+    <string name="btn_disconnect">Disconnect</string>
+    <string name="btn_on">Relay ON</string>
+    <string name="btn_off">Relay OFF</string>
+    <string name="btn_clear_log">Clear</string>
+
+    <string name="connection_state_connected">Status: CONNECTED</string>
+    <string name="connection_state_disconnected">Status: DISCONNECTED</string>
+
+    <string name="send_commands">Comenzi</string>
+    <string name="logs">Log MQTT</string>
+
+    <string name="last_message_empty">Ultimul mesaj: -</string>
+    <string name="last_message_template">Ultimul mesaj\nTopic: %1$s\nPayload: %2$s</string>
+</resources>
