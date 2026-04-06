@@ -1,0 +1,29 @@
+.DS_Store
+
+# Editor / IDE
+.vscode/
+**/.vscode/
+
+# Android / Gradle
+**/.gradle/
+**/build/
+**/local.properties
+*.apk
+*.ap_
+*.aab
+
+# Local toolchains / downloaded SDKs
+**/.toolchain/
+
+# Python virtualenv / caches
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.egg-info/
+
+# Runtime artifacts / logs
+**/artifacts/
+**/soak_mobile_logs/
+*.log
+*.pid
